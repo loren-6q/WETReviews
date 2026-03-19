@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WET! Response Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .wet-gradient { background: linear-gradient(135deg, #ff0080 0%, #7928ca 100%); }
+        .neon-border { box-shadow: 0 0 10px rgba(255, 0, 128, 0.5), 0 0 20px rgba(255, 0, 128, 0.3); }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); }
+        .tab-active { border-bottom: 3px solid #ff0080; color: white; font-weight: 900; }
+        
+        #sync-overlay {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.5s ease;
+        }
+        .sync-hidden { opacity: 0; pointer-events: none; display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen pb-20">
+
+    <!-- Syncing Overlay -->
+    <div id="sync-overlay">
+        <div class="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p id="sync-status" class="text-xs font-black uppercase tracking-widest text-pink-500 text-center px-4">Connecting to WET! Cloud...</p>
+        <button id="skip-sync" onclick="window.hideOverlay()" class="hidden mt-6 text-[10px] text-gray-500 underline uppercase tracking-widest">Skip & Use Local Defaults</button>
+    </div>
+
+    <div class="max-w-xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-6 text-center">
+            <div class="inline-block p-1 rounded-full wet-gradient mb-4 neon-border">
+                <div class="bg-gray-900 rounded-full px-6 py-2">
+                    <h1 class="text-3xl font-black tracking-tighter italic uppercase text-nowrap">WET! <span class="text-pink-500 text-2xl">Response Hub</span></h1>
+                </div>
+            </div>
+            
+            <nav class="flex justify-center space-x-8 mt-4 border-b border-white/10">
+                <button onclick="switchTab('generator')" id="tab-gen" class="pb-2 text-xs uppercase tracking-widest text-gray-500 tab-active transition-all">Generator</button>
+                <button onclick="switchTab('settings')" id="tab-set" class="pb-2 text-xs uppercase tracking-widest text-gray-500 transition-all">Edit Engine Details</button>
+            </nav>
+        </header>
+
+        <!-- GENERATOR TAB -->
+        <main id="view-generator" class="space-y-4">
+            <section class="glass border border-white/10 p-5 rounded-[2rem] shadow-xl">
+                <label class="block text-[10px] font-black uppercase text-pink-500 mb-2 tracking-widest">Public Guest Review</label>
+                <textarea id="reviewInput" rows="4" 
+                    class="w-full bg-gray-900/50 border border-gray-800 rounded-2xl p-4 text-white placeholder-gray-600 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all text-sm"
+                    placeholder="Paste the guest's review here..."></textarea>
+            </section>
+
+            <section class="glass border border-white/10 p-5 rounded-[2rem] shadow-xl bg-yellow-500/5">
+                <label class="block text-[10px] font-black uppercase text-yellow-500 mb-2 tracking-widest">Manager Notes (Internal Context)</label>
+                <textarea id="internalNotes" rows="2" 
+                    class="w-full bg-gray-900/50 border border-gray-800 rounded-2xl p-4 text-white placeholder-gray-600 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all text-sm"
+                    placeholder="e.g. This was a fake review/no-show..."></textarea>
+            </section>
+
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="glass border border-white/10 p-4 rounded-3xl">
+                    <label class="block text-[10px] font-black uppercase text-purple-400 mb-2 tracking-widest">Extra Session Tags</label>
+                    <input id="extraKeywords" type="text" 
+                        class="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 text-sm outline-none focus:border-purple-400"
+                        placeholder="e.g. Beer Pong, Staff name">
+                </div>
+                <div class="glass border border-white/10 p-4 rounded-3xl">
+                    <label class="block text-[10px] font-black uppercase text-blue-400 mb-2 tracking-widest">Issue Explanation</label>
+                    <select id="issueType" class="w-full bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-sm outline-none focus:border-blue-400 appearance-none cursor-pointer">
+                        <option value="general">Standard Positive Response</option>
+                        <option value="noshow">No-Show / Refund Policy</option>
+                        <option value="cleanliness">Cleanliness / Party Atmosphere</option>
+                        <option value="maintenance">Maintenance / Technical Issue</option>
+                        <option value="noise">Noise / Music Volume</option>
+                        <option value="power_water">Power or Water Interruption</option>
+                    </select>
+                </div>
+            </section>
+
+            <button id="generateBtn" onclick="handleGeneration()" 
+                class="w-full wet-gradient hover:brightness-110 active:scale-95 text-white font-black py-5 rounded-3xl shadow-2xl transition-all flex items-center justify-center gap-3">
+                <span id="btnText">GENERATE RESPONSE</span>
+                <div id="loader" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            </button>
+
+            <section id="resultArea" class="hidden space-y-4">
+                <div class="relative group">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-yellow-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                    <div class="relative glass border border-white/10 p-6 rounded-3xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-[10px] font-black uppercase text-green-400 tracking-widest">Drafted Response</h3>
+                            <button onclick="copyResponse()" class="text-[9px] bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full uppercase font-bold transition-colors">Copy</button>
+                        </div>
+                        <p id="generatedText" class="text-md leading-relaxed font-medium text-gray-200">
+                            Response will appear here...
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- SETTINGS TAB -->
+        <main id="view-settings" class="hidden space-y-4">
+            <section class="glass border border-white/10 p-6 rounded-[2rem] shadow-xl space-y-6">
+                
+                <div class="bg-pink-500/10 border border-pink-500/30 p-4 rounded-2xl mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-pink-500 font-black uppercase text-[10px] tracking-widest">SEO Trend Researcher</h3>
+                        <span class="text-[8px] bg-pink-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">Live Search</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mb-3">Identify what Full Moon Party travelers are searching for right now.</p>
+                    <button id="researchBtn" onclick="researchKeywords()" class="w-full bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-black py-2 rounded-lg transition-all">
+                        RESEARCH TRENDING KEYWORDS 🔍
+                    </button>
+                    <div id="researchResultsContainer" class="hidden mt-3 p-3 bg-black/40 rounded-xl border-l-2 border-pink-500">
+                        <div id="researchResults" class="text-[11px] text-pink-100 italic mb-2 leading-relaxed"></div>
+                        <button id="applyKeywordsBtn" onclick="applyResearchedKeywords()" class="hidden text-[10px] bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full font-bold transition-all uppercase">Add to My Keywords</button>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Permanent SEO Keywords</h2>
+                    <textarea id="kb-keywords" rows="3" 
+                        class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
+                        placeholder="Comma separated keywords..."></textarea>
+                </div>
+
+                <div>
+                    <h2 class="text-yellow-500 font-black uppercase text-xs mb-4 tracking-widest">Hostel Policy Knowledge Base</h2>
+                    <textarea id="kb-details" rows="8" 
+                        class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-yellow-500"
+                        placeholder="Describe your staff, pool, parties, and cleaning policies in detail..."></textarea>
+                    <p class="text-[10px] text-gray-500 mt-2">The more details you add here, the better the AI defends your policies.</p>
+                </div>
+
+                <button id="saveBtn" onclick="saveSettings()" class="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all">
+                    UPDATE CLOUD DATA ✅
+                </button>
+            </section>
+        </main>
+
+        <footer class="mt-8 text-center text-gray-700 text-[9px] uppercase tracking-widest font-bold">
+            WET! • Cloud Connected Response Hub
+        </footer>
+    </div>
+
+    <!-- Toast Message -->
+    <div id="toast" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 bg-white text-black font-black px-8 py-4 rounded-full shadow-2xl z-50 uppercase tracking-tighter">
+        COPIED!
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global State & Config
+        const apiKey = "";
+        
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } catch (e) {
+            console.error("Firebase config missing or invalid.");
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        const defaultData = {
+            keywords: "Full Moon Party, WET!, WET Pool Party, most social, Koh Phangan, Wild & Wandering",
+            details: "WET! is a 24-hour pool party hostel. We have a swim-up bar, games, and beer pong. Pre-party hub for Jungle Experience, Waterfall Party, and OXA Party. 24h staff, housekeeping, and maintenance. Guest Group Chat available for all info and reporting issues. Housekeeping cleans twice daily, but 24h parties mean messes can occur; we fix them in minutes via the chat."
+        };
+
+        window.currentSettings = defaultData;
+
+        // Unified AI Request Helper with Exponential Backoff and Error Handling
+        async function executeGeminiRequest(payload, retries = 5) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            let delay = 1000;
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const responseText = await response.text();
+                    
+                    if (!response.ok) {
+                        let errorMessage = `HTTP ${response.status}`;
+                        try {
+                            const errData = JSON.parse(responseText);
+                            errorMessage = errData.error?.message || errorMessage;
+                        } catch (e) { /* ignore parse error on error text */ }
+                        throw new Error(errorMessage);
+                    }
+
+                    if (!responseText) {
+                        throw new Error('Empty response body from API');
+                    }
+
+                    const result = JSON.parse(responseText);
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        // UI Helpers
+        window.hideOverlay = () => {
+            const overlay = document.getElementById('sync-overlay');
+            if (overlay) {
+                overlay.classList.add('sync-hidden');
+            }
+        };
+
+        const syncTimeout = setTimeout(() => {
+            const status = document.getElementById('sync-status');
+            if (status) status.innerText = "Cloud taking too long. You can continue, and data will sync when ready.";
+            const skip = document.getElementById('skip-sync');
+            if (skip) skip.classList.remove('hidden');
+        }, 8000);
+
+        // Persistent Init Logic
+        const init = async () => {
+            try {
+                // Rule 3: Auth First
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (!user) return;
+
+                    // Rule 1: Correct Path Segments (6)
+                    const settingsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
+                    
+                    // Listen for cloud changes
+                    onSnapshot(settingsDocRef, (docSnap) => {
+                        clearTimeout(syncTimeout);
+                        if (docSnap.exists()) {
+                            window.currentSettings = docSnap.data();
+                            // Update UI
+                            document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
+                            document.getElementById('kb-details').value = window.currentSettings.details || "";
+                        } else {
+                            // Seed if totally empty
+                            setDoc(settingsDocRef, defaultData);
+                        }
+                        window.hideOverlay();
+                    }, (err) => {
+                        console.error("Firestore access error:", err);
+                        window.hideOverlay();
+                    });
+                });
+            } catch (err) {
+                console.error("Auth process crashed:", err);
+                window.hideOverlay();
+            }
+        };
+
+        // UI Handlers
+        window.saveSettings = async () => {
+            if (!auth.currentUser) {
+                window.showToast("Offline Mode - Cannot save to cloud", "bg-red-500 text-white");
+                return;
+            }
+            const btn = document.getElementById('saveBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "SYNCING TO CLOUD...";
+            btn.disabled = true;
+            
+            const settingsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
+            const data = {
+                keywords: document.getElementById('kb-keywords').value,
+                details: document.getElementById('kb-details').value,
+                lastUpdated: Date.now()
+            };
+            
+            try {
+                await setDoc(settingsDocRef, data);
+                window.currentSettings = data;
+                btn.innerText = originalText;
+                btn.disabled = false;
+                window.showToast("CLOUD UPDATED! ✅");
+                window.switchTab('generator');
+            } catch (err) {
+                console.error("Save failure:", err);
+                btn.innerText = "RETRY SAVE";
+                btn.disabled = false;
+                window.showToast("Failed to save cloud data", "bg-red-500 text-white");
+            }
+        };
+
+        window.researchKeywords = async () => {
+            const container = document.getElementById('researchResultsContainer');
+            const resultsBox = document.getElementById('researchResults');
+            const btn = document.getElementById('researchBtn');
+            const applyBtn = document.getElementById('applyKeywordsBtn');
+            const originalBtnText = btn.innerText;
+            
+            btn.innerText = "SCRAPING TRENDS...";
+            btn.disabled = true;
+            container.classList.remove('hidden');
+            applyBtn.classList.add('hidden');
+            resultsBox.innerText = "Analyzing current Google Search trends for Koh Phangan...";
+
+            const prompt = "Research current traveler trends for 'Full Moon Party 2026' and 'Koh Phangan party hostels'. Provide ONLY a single comma-separated list of 12-15 high-performing keywords. No sentences, just the list.";
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                tools: [{ "google_search": {} }]
+            };
+
+            try {
+                const text = await executeGeminiRequest(payload);
+                if (text && text.trim().length > 5) {
+                    resultsBox.innerText = text.trim();
+                    applyBtn.classList.remove('hidden');
+                } else {
+                    resultsBox.innerText = "No specific trends found. Try again in a moment.";
+                }
+            } catch (e) {
+                console.error("Research failed:", e);
+                resultsBox.innerText = "Trend data currently unavailable. Manual input recommended.";
+            } finally {
+                btn.innerText = originalBtnText;
+                btn.disabled = false;
+            }
+        };
+
+        window.applyResearchedKeywords = () => {
+            const resultsBox = document.getElementById('researchResults');
+            const keywordsInput = document.getElementById('kb-keywords');
+            const newKeys = resultsBox.innerText.trim();
+            
+            if (keywordsInput.value.trim()) {
+                keywordsInput.value = keywordsInput.value.trim() + ", " + newKeys;
+            } else {
+                keywordsInput.value = newKeys;
+            }
+            window.showToast("ADDED TO LIST! ✨");
+        };
+
+        window.handleGeneration = async () => {
+            const reviewText = document.getElementById('reviewInput').value;
+            const internalNotes = document.getElementById('internalNotes').value;
+            const extraKeywords = document.getElementById('extraKeywords').value;
+            const issueType = document.getElementById('issueType').value;
+            const btnText = document.getElementById('btnText');
+            const loader = document.getElementById('loader');
+            const resultArea = document.getElementById('resultArea');
+            const generatedText = document.getElementById('generatedText');
+
+            if (!reviewText) {
+                window.showToast("Paste a review first!", "bg-red-500 text-white");
+                return;
+            }
+
+            btnText.innerText = "WRITING...";
+            loader.classList.remove('hidden');
+            resultArea.classList.remove('hidden');
+            generatedText.innerText = "Drafting with policy context...";
+
+            const kb = window.currentSettings || defaultData;
+
+            const systemPrompt = `You are the Manager of WET! Pool Party Hostel.
+            Policy/Knowledge Base: ${kb.details}
+            Required SEO Keywords: ${kb.keywords}
+            Style: Professional, polite, clear.
+            Rebuttal Logic: Always apologize first for complaints. Then explain based on Knowledge Base. 
+            Internal Context: ${internalNotes}
+            Specific Focus: ${issueType}
+            Constraint: Exactly 2-3 sentences.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: reviewText }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            try {
+                const text = await executeGeminiRequest(payload);
+                generatedText.innerText = text || "Review generated, but empty.";
+            } catch (error) {
+                console.error("Gen failure:", error);
+                generatedText.innerText = "API Error. Please try again.";
+            } finally {
+                btnText.innerText = "GENERATE RESPONSE";
+                loader.classList.add('hidden');
+            }
+        };
+
+        init();
+    </script>
+
+    <script>
+        function switchTab(tab) {
+            const genView = document.getElementById('view-generator');
+            const setView = document.getElementById('view-settings');
+            const genTab = document.getElementById('tab-gen');
+            const setTab = document.getElementById('tab-set');
+
+            if (tab === 'generator') {
+                genView.classList.remove('hidden');
+                setView.classList.add('hidden');
+                genTab.classList.add('tab-active');
+                setTab.classList.remove('tab-active');
+            } else {
+                genView.classList.add('hidden');
+                setView.classList.remove('hidden');
+                genTab.classList.remove('tab-active');
+                setTab.classList.add('tab-active');
+            }
+        }
+
+        function copyResponse() {
+            const text = document.getElementById('generatedText').innerText;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast("COPIED!");
+        }
+
+        function showToast(message, colorClass = "bg-white text-black") {
+            const toast = document.getElementById('toast');
+            if (toast) {
+                toast.innerText = message;
+                toast.className = `fixed bottom-10 left-1/2 -translate-x-1/2 font-black px-8 py-4 rounded-full shadow-2xl z-50 uppercase tracking-tighter ${colorClass}`;
+                toast.classList.remove('hidden');
+                setTimeout(() => toast.classList.add('hidden'), 2000);
+            }
+        }
+        
+        window.showToast = showToast;
+        window.switchTab = switchTab;
+    </script>
+    <script src="https://loren-6q.github.io/WETNav/nav.js"></script>
+</body>
+</html>
