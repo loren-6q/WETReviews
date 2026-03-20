@@ -170,7 +170,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration (User-Provided)
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDYBzx9lApoIbYq4GoCLdX4mhSIPt8keSA",
             authDomain: "wetreviews1.firebaseapp.com",
@@ -208,24 +208,19 @@
         loadLocalCache();
 
         /**
-         * Robust AI Requester with Exponential Backoff
-         * Fixes JSON Payload structure for v1beta compatibility
+         * Production-Ready AI Requester
+         * Uses production v1 endpoint and base flash model name for maximum stability.
          */
         async function executeGeminiRequest(userPrompt, systemContext, retries = 5) {
             const key = document.getElementById('kb-gemini-key').value;
             if (!key) throw new Error("Missing Gemini API Key. Go to Settings and set it.");
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+            // Standardize to production v1 endpoint which is more reliable for base gemini-1.5-flash
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`;
             let delay = 1000;
 
-            // Merging context into prompt to bypass 'systemInstruction' schema errors on various API versions
-            const promptPayload = `
-SYSTEM CONTEXT:
-${systemContext}
-
-USER INPUT:
-${userPrompt}
-            `;
+            // Merging context into prompt for perfect cross-version compatibility
+            const promptPayload = `SYSTEM INSTRUCTIONS:\n${systemContext}\n\nUSER INPUT / REVIEW:\n${userPrompt}`;
 
             const body = {
                 contents: [{ parts: [{ text: promptPayload }] }]
@@ -242,12 +237,12 @@ ${userPrompt}
                     const result = await response.json();
                     if (!response.ok) {
                         const err = result.error?.message || `Error ${response.status}`;
-                        // If it's a 400 bad request, likely prompt injection/safety or key issue - don't retry
+                        // Fatal errors (403/400) shouldn't retry
                         if (response.status === 400 || response.status === 403) throw new Error(err);
                         throw new Error(err);
                     }
                     
-                    if (!result.candidates || result.candidates.length === 0) throw new Error("Empty candidate response");
+                    if (!result.candidates || result.candidates.length === 0) throw new Error("AI safety filter triggered. No response.");
                     return result.candidates[0].content.parts[0].text;
                 } catch (error) {
                     if (i === retries - 1) throw error;
@@ -264,14 +259,11 @@ ${userPrompt}
                 const auth = getAuth(app);
                 const db = getFirestore(app);
 
-                // RULE 3 - Auth Before Query
                 await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, (user) => {
                     if (!user) return;
                     
-                    // RULE 1 - Strict Path (/artifacts/{appId}/public/data/{collectionName}/{docName})
-                    // 6 segments: artifacts(1), wetreviews1-main(2), public(3), data(4), settings(5), global(6)
                     const docRef = doc(db, 'artifacts', hostelId, 'public', 'data', 'settings', 'global');
                     
                     onSnapshot(docRef, (docSnap) => {
@@ -287,12 +279,12 @@ ${userPrompt}
                         }
                         window.hideOverlay();
                     }, (err) => {
-                        console.error("Firestore Listen Error:", err);
+                        console.error("Cloud Sync Error:", err);
                         window.hideOverlay();
                     });
                 });
             } catch (err) {
-                console.error("Initialization Failed:", err);
+                console.error("Cloud Connection Failed:", err);
                 window.hideOverlay();
             }
         };
@@ -315,7 +307,7 @@ ${userPrompt}
                 window.showToast("CLOUD SYNCED! ✅");
                 window.switchTab('generator');
             } catch (e) {
-                window.showToast("SYNC FAILED - CHECK FIREBASE RULES", "bg-red-500");
+                window.showToast("SYNC FAILED - CHECK DB RULES", "bg-red-500");
             }
         };
 
@@ -332,7 +324,7 @@ ${userPrompt}
 
             try {
                 const text = await executeGeminiRequest(
-                    "Act as an SEO strategist. Provide a comma-separated list of 12 trending SEO keywords for 'Full Moon Party 2026' hostels. Single line only.",
+                    "Provide a comma-separated list of 12 trending SEO keywords for 'Full Moon Party 2026' and party hostels in Koh Phangan. Single line only.",
                     "SEO Research Assistant"
                 );
                 resultsBox.innerText = text;
@@ -369,10 +361,10 @@ ${userPrompt}
             const systemPrompt = `You are the Manager of WET! Pool Party Hostel.
 Policy: ${kb.details}
 Keywords: ${kb.keywords}, ${extraKeywords}
-Style: Professional, concise, hospitable.
-Logic: Always apologize for negative points first. Then explain clearly using hostel policies.
-Specific Context: ${internalNotes} (Focus area: ${issueType})
-Constraint: Exactly 2-3 sentences. No fluff.`;
+Style: Professional, hospitality-focused, concise.
+Logic: Acknowledge negative points politely. Explain using hostel policies (24h staff, 24h cleaning, etc).
+Internal Context: ${internalNotes} (Focus: ${issueType})
+Constraint: Exactly 2-3 sentences.`;
 
             try {
                 const text = await executeGeminiRequest(reviewText, systemPrompt);
