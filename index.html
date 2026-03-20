@@ -167,7 +167,7 @@
         // 🛠️ HARDCODED SECRETS - PASTE YOUR GEMINI KEY HERE
         // ========================================================
         
-        const MY_GEMINI_API_KEY = "AIzaSyBt1031T5YFQw1KZdYLjwc7R9_Tbkoiov8"; 
+        const MY_GEMINI_API_KEY = "PASTE_YOUR_API_KEY_HERE"; 
 
         const MY_FIREBASE_CONFIG = {
             apiKey: "AIzaSyDYBzx9lApoIbYq4GoCLdX4mhSIPt8keSA",
@@ -213,8 +213,8 @@
                 throw new Error("API Key placeholder detected. Please paste your actual key in the code.");
             }
 
-            // Using the stable-release preview model for highest compatibility
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${MY_GEMINI_API_KEY}`;
+            // Switched to 'gemini-1.5-flash' which is the widely available standard stable model
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_GEMINI_API_KEY}`;
             let delay = 1000;
 
             for (let i = 0; i < retries; i++) {
@@ -314,7 +314,7 @@
             try {
                 const text = await executeGeminiRequest({
                     contents: [{ parts: [{ text: prompt }] }],
-                    tools: [{ "google_search": {} }]
+                    // tools: [{ "google_search": {} }] // Removed tools to ensure base model compatibility for research
                 });
                 resultsBox.innerText = text || "No trends found.";
                 applyBtn.classList.remove('hidden');
