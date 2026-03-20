@@ -32,12 +32,11 @@
     <!-- Syncing Overlay -->
     <div id="sync-overlay">
         <div class="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p id="sync-status" class="text-xs font-black uppercase tracking-widest text-pink-500 text-center px-4 italic">Syncing WET! Cloud Data...</p>
+        <p id="sync-status" class="text-xs font-black uppercase tracking-widest text-pink-500 text-center px-4 italic">Connecting to WET! Cloud...</p>
         <button id="skip-sync" onclick="window.hideOverlay()" class="mt-6 text-[10px] text-gray-500 underline uppercase tracking-widest px-6 py-2 border border-gray-700 rounded-full hover:bg-white/5 transition-all text-nowrap">Use Offline Mode</button>
     </div>
 
     <div class="max-w-xl mx-auto px-4 py-8">
-        <!-- Header -->
         <header class="mb-6 text-center">
             <div class="inline-block p-1 rounded-full wet-gradient mb-4 neon-border">
                 <div class="bg-gray-900 rounded-full px-6 py-2">
@@ -72,7 +71,7 @@
                     <label class="block text-[10px] font-black uppercase text-purple-400 mb-2 tracking-widest">Extra Tags</label>
                     <input id="extraKeywords" type="text" 
                         class="w-full bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-sm outline-none focus:border-purple-400"
-                        placeholder="e.g. Foam Party, Staff name">
+                        placeholder="e.g. DJ Name, Foam Party">
                 </div>
                 <div class="glass border border-white/10 p-4 rounded-3xl">
                     <label class="block text-[10px] font-black uppercase text-blue-400 mb-2 tracking-widest">Rebuttal Type</label>
@@ -113,12 +112,12 @@
         <main id="view-settings" class="hidden space-y-4">
             <section class="glass border border-white/10 p-6 rounded-[2rem] shadow-xl space-y-6">
                 
-                <div class="bg-pink-500/10 border border-pink-500/30 p-4 rounded-2xl mb-4">
+                <div class="bg-pink-500/10 border border-pink-500/30 p-4 rounded-2xl mb-4 text-nowrap">
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="text-pink-500 font-black uppercase text-[10px] tracking-widest">SEO Trend Researcher</h3>
                         <span class="text-[8px] bg-pink-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">Live Search</span>
                     </div>
-                    <p class="text-[11px] text-gray-400 mb-3">Find what Full Moon Party travelers are searching for right now.</p>
+                    <p class="text-[11px] text-gray-400 mb-3">Identify trending keywords for Full Moon 2026.</p>
                     <button id="researchBtn" onclick="researchKeywords()" class="w-full bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-black py-2 rounded-lg transition-all">
                         RESEARCH TRENDING KEYWORDS 🔍
                     </button>
@@ -129,6 +128,14 @@
                 </div>
 
                 <div>
+                    <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Gemini API Key (Manager Only)</h2>
+                    <input id="kb-gemini-key" type="password" 
+                        class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
+                        placeholder="Paste your Gemini API Key here...">
+                    <p class="text-[9px] text-gray-500 mt-2 italic">Stored in Cloud. Staff will see dots. Setting this here prevents Google from disabling your key on GitHub.</p>
+                </div>
+
+                <div>
                     <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Global SEO Keywords</h2>
                     <textarea id="kb-keywords" rows="3" 
                         class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
@@ -136,7 +143,7 @@
                 </div>
 
                 <div>
-                    <h2 class="text-yellow-500 font-black uppercase text-xs mb-4 tracking-widest text-nowrap">Hostel Knowledge Base</h2>
+                    <h2 class="text-yellow-500 font-black uppercase text-xs mb-4 tracking-widest">Hostel Knowledge Base</h2>
                     <textarea id="kb-details" rows="8" 
                         class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-yellow-500"
                         placeholder="Policies, staff info, and 24h cleaning details..."></textarea>
@@ -149,7 +156,7 @@
         </main>
 
         <footer class="mt-8 text-center text-gray-700 text-[9px] uppercase tracking-widest font-bold">
-            WET! • Cloud Connected Hub
+            WET! • Cloud Connected Response Hub
         </footer>
     </div>
 
@@ -160,16 +167,13 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ========================================================
-        // 🛠️ HARDCODED SECRETS - PASTE YOUR GEMINI KEY HERE
+        // 🛠️ FIREBASE CONFIG
         // ========================================================
-        
-        const MY_GEMINI_API_KEY = "AIzaSyBt1031T5YFQw1KZdYLjwc7R9_Tbkoiov8"; 
-
-        const MY_FIREBASE_CONFIG = {
+        const firebaseConfig = {
             apiKey: "AIzaSyDYBzx9lApoIbYq4GoCLdX4mhSIPt8keSA",
             authDomain: "wetreviews1.firebaseapp.com",
             projectId: "wetreviews1",
@@ -177,14 +181,13 @@
             messagingSenderId: "311792614972",
             appId: "1:311792614972:web:9e36b05fdacd4698138d39"
         };
-        const MY_HOSTEL_ID = "wetreviews1-main";
+        const hostelId = "wetreviews1-main";
         // ========================================================
 
-        const hostelId = MY_HOSTEL_ID;
-        const firebaseConfig = MY_FIREBASE_CONFIG;
         const defaultData = {
+            geminiKey: "",
             keywords: "Full Moon Party, WET!, WET Pool Party, most social, Koh Phangan, Wild & Wandering",
-            details: "WET! is a 24-hour pool party hostel. Large pool with garden, swim up bar, games, beer pong, DJs. Pre-party hub for Jungle Experience, Waterfall Party, and OXA Party. 24h staff, housekeeping, and maintenance. Guest Group Chat available for reporting issues. Housekeeping cleans twice daily."
+            details: "WET! is a 24-hour pool party hostel. Housekeeping cleans twice daily, available 24/7 via guest chat. Maintenance on-site 24/7. Hub for Jungle Experience and Waterfall Party."
         };
 
         window.currentSettings = defaultData;
@@ -198,23 +201,18 @@
             const saved = localStorage.getItem('wet_local_settings');
             if (saved) {
                 window.currentSettings = JSON.parse(saved);
+                document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                 document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                 document.getElementById('kb-details').value = window.currentSettings.details || "";
-            } else {
-                document.getElementById('kb-keywords').value = defaultData.keywords;
-                document.getElementById('kb-details').value = defaultData.details;
             }
         };
-
         loadLocalData();
 
         async function executeGeminiRequest(payload, retries = 5) {
-            if (!MY_GEMINI_API_KEY || MY_GEMINI_API_KEY === "PASTE_YOUR_API_KEY_HERE") {
-                throw new Error("API Key placeholder detected. Please paste your actual key in the code.");
-            }
+            const activeKey = document.getElementById('kb-gemini-key').value;
+            if (!activeKey) throw new Error("Missing Gemini API Key. Go to Settings and set it.");
 
-            // Switched to 'gemini-1.5-flash' which is the widely available standard stable model
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_GEMINI_API_KEY}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeKey}`;
             let delay = 1000;
 
             for (let i = 0; i < retries; i++) {
@@ -226,21 +224,10 @@
                     });
                     
                     const result = await response.json();
-
-                    if (!response.ok) {
-                        const errorMsg = result.error?.message || `HTTP Error ${response.status}`;
-                        throw new Error(errorMsg);
-                    }
-
-                    if (!result.candidates || result.candidates.length === 0) {
-                        throw new Error("No response generated. The review might have triggered a safety filter.");
-                    }
-
+                    if (!response.ok) throw new Error(result.error?.message || `HTTP ${response.status}`);
                     return result.candidates[0].content.parts[0].text;
                 } catch (error) {
-                    if (i === retries - 1 || error.message.includes("API Key") || error.message.includes("403")) {
-                        throw error;
-                    }
+                    if (i === retries - 1 || error.message.includes("403") || error.message.includes("key")) throw error;
                     await new Promise(res => setTimeout(res, delay));
                     delay *= 2;
                 }
@@ -260,6 +247,7 @@
                     onSnapshot(settingsDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             window.currentSettings = docSnap.data();
+                            document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                             document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                             document.getElementById('kb-details').value = window.currentSettings.details || "";
                             localStorage.setItem('wet_local_settings', JSON.stringify(window.currentSettings));
@@ -268,7 +256,7 @@
                         }
                         window.hideOverlay();
                     }, (err) => {
-                        console.error("Cloud Access Issue - Check Firestore Rules");
+                        console.error("Firestore Access Restricted");
                         window.hideOverlay();
                     });
                 });
@@ -280,6 +268,7 @@
 
         window.saveSettings = async () => {
             const data = {
+                geminiKey: document.getElementById('kb-gemini-key').value,
                 keywords: document.getElementById('kb-keywords').value,
                 details: document.getElementById('kb-details').value,
                 lastUpdated: Date.now()
@@ -302,24 +291,18 @@
             const resultsBox = document.getElementById('researchResults');
             const btn = document.getElementById('researchBtn');
             const applyBtn = document.getElementById('applyKeywordsBtn');
-            const originalText = btn.innerText;
-
             btn.innerText = "SCRAPING TRENDS...";
             btn.disabled = true;
             document.getElementById('researchResultsContainer').classList.remove('hidden');
             resultsBox.innerText = "Querying Phangan party trends...";
-
-            const prompt = "Research current traveler trends for 'Full Moon Party 2026' and Koh Phangan hostels. Provide ONLY a comma-separated list of 12 SEO keywords. No intro.";
-
             try {
                 const text = await executeGeminiRequest({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    // tools: [{ "google_search": {} }] // Removed tools to ensure base model compatibility for research
+                    contents: [{ parts: [{ text: "Provide a comma-separated list of 12 SEO keywords for 'Full Moon Party 2026' hostels. Single line only." }] }]
                 });
-                resultsBox.innerText = text || "No trends found.";
+                resultsBox.innerText = text;
                 applyBtn.classList.remove('hidden');
             } catch (e) {
-                resultsBox.innerText = "Research error: " + e.message;
+                resultsBox.innerText = "Error: " + e.message;
             } finally {
                 btn.innerText = "RESEARCH TRENDING KEYWORDS 🔍";
                 btn.disabled = false;
@@ -339,34 +322,26 @@
             const extraKeywords = document.getElementById('extraKeywords').value;
             const issueType = document.getElementById('issueType').value;
             const btnText = document.getElementById('btnText');
-            const loader = document.getElementById('loader');
             const resultArea = document.getElementById('resultArea');
             const generatedText = document.getElementById('generatedText');
 
-            if (!reviewText) {
-                window.showToast("Paste a review first!", "bg-red-500 text-white");
-                return;
-            }
-
+            if (!reviewText) { window.showToast("Paste a review first!", "bg-red-500"); return; }
             btnText.innerText = "WRITING...";
-            loader.classList.remove('hidden');
             resultArea.classList.remove('hidden');
-            generatedText.innerText = "Drafting with policy context...";
 
             const kb = window.currentSettings;
-            const systemPrompt = `Manager of WET! Pool Party Hostel. Policy: ${kb.details}. Keywords: ${kb.keywords}. Style: Professional/Clear. Rebuttal: Apologize first, explain clearly. Notes: ${internalNotes} (${issueType}). Constraint: 2-3 sentences.`;
+            const systemPrompt = `Manager of WET! Pool Party Hostel. Policy: ${kb.details}. Keywords: ${kb.keywords}, ${extraKeywords}. Professional/Polite style. Rebuttal: Apologize first, then explain. Notes: ${internalNotes} (${issueType}). Constraint: 2-3 sentences.`;
 
             try {
                 const text = await executeGeminiRequest({
                     contents: [{ parts: [{ text: reviewText }] }],
                     systemInstruction: { parts: [{ text: systemPrompt }] }
                 });
-                generatedText.innerText = text || "Error drafting.";
+                generatedText.innerText = text;
             } catch (error) {
-                generatedText.innerText = "Error: " + error.message;
+                generatedText.innerText = "API Error: " + error.message;
             } finally {
                 btnText.innerText = "GENERATE RESPONSE";
-                loader.classList.add('hidden');
             }
         };
 
