@@ -128,14 +128,6 @@
                 </div>
 
                 <div>
-                    <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Gemini API Key (Manager Only)</h2>
-                    <input id="kb-gemini-key" type="password" 
-                        class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
-                        placeholder="Paste your Gemini API Key here...">
-                    <p class="text-[9px] text-gray-500 mt-2 italic">Stored in Cloud. Staff will see dots. Setting this here prevents Google from disabling your key on GitHub.</p>
-                </div>
-
-                <div>
                     <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Global SEO Keywords</h2>
                     <textarea id="kb-keywords" rows="3" 
                         class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
@@ -143,7 +135,7 @@
                 </div>
 
                 <div>
-                    <h2 class="text-yellow-500 font-black uppercase text-xs mb-4 tracking-widest">Hostel Knowledge Base</h2>
+                    <h2 class="text-yellow-500 font-black uppercase text-xs mb-4 tracking-widest text-nowrap">Hostel Knowledge Base</h2>
                     <textarea id="kb-details" rows="8" 
                         class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-yellow-500"
                         placeholder="Policies, staff info, and 24h cleaning details..."></textarea>
@@ -171,8 +163,11 @@
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ========================================================
-        // 🛠️ FIREBASE CONFIG
+        // 🛠️ SECRETS - PASTE YOUR KEYS HERE
         // ========================================================
+        
+        const MY_GEMINI_API_KEY = "PASTE_YOUR_NEW_KEY_HERE"; 
+
         const firebaseConfig = {
             apiKey: "AIzaSyDYBzx9lApoIbYq4GoCLdX4mhSIPt8keSA",
             authDomain: "wetreviews1.firebaseapp.com",
@@ -185,9 +180,8 @@
         // ========================================================
 
         const defaultData = {
-            geminiKey: "",
             keywords: "Full Moon Party, WET!, WET Pool Party, most social, Koh Phangan, Wild & Wandering",
-            details: "WET! is a 24-hour pool party hostel. Housekeeping cleans twice daily, available 24/7 via guest chat. Maintenance on-site 24/7. Hub for Jungle Experience and Waterfall Party."
+            details: "WET! is a 24-hour pool party hostel. Large pool with garden, swim up bar, games, beer pong, DJs. Pre-party hub for Jungle Experience, Waterfall Party, and OXA Party. 24h staff, housekeeping, and maintenance. Guest Group Chat available for reporting issues. Housekeeping cleans twice daily."
         };
 
         window.currentSettings = defaultData;
@@ -201,18 +195,23 @@
             const saved = localStorage.getItem('wet_local_settings');
             if (saved) {
                 window.currentSettings = JSON.parse(saved);
-                document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                 document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                 document.getElementById('kb-details').value = window.currentSettings.details || "";
+            } else {
+                document.getElementById('kb-keywords').value = defaultData.keywords;
+                document.getElementById('kb-details').value = defaultData.details;
             }
         };
+
         loadLocalData();
 
         async function executeGeminiRequest(payload, retries = 5) {
-            const activeKey = document.getElementById('kb-gemini-key').value;
-            if (!activeKey) throw new Error("Missing Gemini API Key. Go to Settings and set it.");
+            if (!MY_GEMINI_API_KEY || MY_GEMINI_API_KEY === "PASTE_YOUR_NEW_KEY_HERE") {
+                throw new Error("Missing API Key. Paste your key in the code at line 144.");
+            }
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeKey}`;
+            // Switched to production stable v1 endpoint and standardized gemini-1.5-flash model ID
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${MY_GEMINI_API_KEY}`;
             let delay = 1000;
 
             for (let i = 0; i < retries; i++) {
@@ -224,10 +223,21 @@
                     });
                     
                     const result = await response.json();
-                    if (!response.ok) throw new Error(result.error?.message || `HTTP ${response.status}`);
+
+                    if (!response.ok) {
+                        const errorMsg = result.error?.message || `HTTP Error ${response.status}`;
+                        throw new Error(errorMsg);
+                    }
+
+                    if (!result.candidates || result.candidates.length === 0) {
+                        throw new Error("No response generated. Safety filters may have blocked the content.");
+                    }
+
                     return result.candidates[0].content.parts[0].text;
                 } catch (error) {
-                    if (i === retries - 1 || error.message.includes("403") || error.message.includes("key")) throw error;
+                    if (i === retries - 1 || error.message.includes("API key") || error.message.includes("403")) {
+                        throw error;
+                    }
                     await new Promise(res => setTimeout(res, delay));
                     delay *= 2;
                 }
@@ -247,7 +257,6 @@
                     onSnapshot(settingsDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             window.currentSettings = docSnap.data();
-                            document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                             document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                             document.getElementById('kb-details').value = window.currentSettings.details || "";
                             localStorage.setItem('wet_local_settings', JSON.stringify(window.currentSettings));
@@ -256,7 +265,7 @@
                         }
                         window.hideOverlay();
                     }, (err) => {
-                        console.error("Firestore Access Restricted");
+                        console.error("Firestore Access Error");
                         window.hideOverlay();
                     });
                 });
@@ -268,7 +277,6 @@
 
         window.saveSettings = async () => {
             const data = {
-                geminiKey: document.getElementById('kb-gemini-key').value,
                 keywords: document.getElementById('kb-keywords').value,
                 details: document.getElementById('kb-details').value,
                 lastUpdated: Date.now()
@@ -291,20 +299,23 @@
             const resultsBox = document.getElementById('researchResults');
             const btn = document.getElementById('researchBtn');
             const applyBtn = document.getElementById('applyKeywordsBtn');
+            const originalText = btn.innerText;
+
             btn.innerText = "SCRAPING TRENDS...";
             btn.disabled = true;
             document.getElementById('researchResultsContainer').classList.remove('hidden');
             resultsBox.innerText = "Querying Phangan party trends...";
+
             try {
                 const text = await executeGeminiRequest({
-                    contents: [{ parts: [{ text: "Provide a comma-separated list of 12 SEO keywords for 'Full Moon Party 2026' hostels. Single line only." }] }]
+                    contents: [{ parts: [{ text: "Act as an SEO expert. Provide a comma-separated list of 12 trending SEO keywords for 'Full Moon Party 2026' hostels in Koh Phangan. Provide ONLY the comma-separated list on a single line." }] }]
                 });
-                resultsBox.innerText = text;
+                resultsBox.innerText = text || "No trends found.";
                 applyBtn.classList.remove('hidden');
             } catch (e) {
-                resultsBox.innerText = "Error: " + e.message;
+                resultsBox.innerText = "Research error: " + e.message;
             } finally {
-                btn.innerText = "RESEARCH TRENDING KEYWORDS 🔍";
+                btn.innerText = originalText;
                 btn.disabled = false;
             }
         };
@@ -322,6 +333,7 @@
             const extraKeywords = document.getElementById('extraKeywords').value;
             const issueType = document.getElementById('issueType').value;
             const btnText = document.getElementById('btnText');
+            const loader = document.getElementById('loader');
             const resultArea = document.getElementById('resultArea');
             const generatedText = document.getElementById('generatedText');
 
@@ -330,7 +342,7 @@
             resultArea.classList.remove('hidden');
 
             const kb = window.currentSettings;
-            const systemPrompt = `Manager of WET! Pool Party Hostel. Policy: ${kb.details}. Keywords: ${kb.keywords}, ${extraKeywords}. Professional/Polite style. Rebuttal: Apologize first, then explain. Notes: ${internalNotes} (${issueType}). Constraint: 2-3 sentences.`;
+            const systemPrompt = `Manager of WET! Pool Party Hostel. Policy: ${kb.details}. Keywords: ${kb.keywords}. Style: Professional/Clear. Rebuttal: Apologize first, explain clearly. Notes: ${internalNotes} (${issueType}). Constraint: 2-3 sentences.`;
 
             try {
                 const text = await executeGeminiRequest({
