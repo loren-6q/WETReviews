@@ -210,9 +210,10 @@
 
         async function executeGeminiRequest(payload, retries = 5) {
             if (!MY_GEMINI_API_KEY || MY_GEMINI_API_KEY === "PASTE_YOUR_API_KEY_HERE") {
-                throw new Error("API Key not found in code");
+                throw new Error("API Key placeholder detected. Please paste your actual key in the code.");
             }
 
+            // Using the stable-release preview model for highest compatibility
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${MY_GEMINI_API_KEY}`;
             let delay = 1000;
 
@@ -224,11 +225,22 @@
                         body: JSON.stringify(payload)
                     });
                     
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (!response.ok) {
+                        const errorMsg = result.error?.message || `HTTP Error ${response.status}`;
+                        throw new Error(errorMsg);
+                    }
+
+                    if (!result.candidates || result.candidates.length === 0) {
+                        throw new Error("No response generated. The review might have triggered a safety filter.");
+                    }
+
+                    return result.candidates[0].content.parts[0].text;
                 } catch (error) {
-                    if (i === retries - 1) throw error;
+                    if (i === retries - 1 || error.message.includes("API Key") || error.message.includes("403")) {
+                        throw error;
+                    }
                     await new Promise(res => setTimeout(res, delay));
                     delay *= 2;
                 }
@@ -307,7 +319,7 @@
                 resultsBox.innerText = text || "No trends found.";
                 applyBtn.classList.remove('hidden');
             } catch (e) {
-                resultsBox.innerText = "Research error. Check hardcoded API Key.";
+                resultsBox.innerText = "Research error: " + e.message;
             } finally {
                 btn.innerText = "RESEARCH TRENDING KEYWORDS 🔍";
                 btn.disabled = false;
@@ -339,6 +351,7 @@
             btnText.innerText = "WRITING...";
             loader.classList.remove('hidden');
             resultArea.classList.remove('hidden');
+            generatedText.innerText = "Drafting with policy context...";
 
             const kb = window.currentSettings;
             const systemPrompt = `Manager of WET! Pool Party Hostel. Policy: ${kb.details}. Keywords: ${kb.keywords}. Style: Professional/Clear. Rebuttal: Apologize first, explain clearly. Notes: ${internalNotes} (${issueType}). Constraint: 2-3 sentences.`;
@@ -350,7 +363,7 @@
                 });
                 generatedText.innerText = text || "Error drafting.";
             } catch (error) {
-                generatedText.innerText = "Check your API Key in the code.";
+                generatedText.innerText = "Error: " + error.message;
             } finally {
                 btnText.innerText = "GENERATE RESPONSE";
                 loader.classList.add('hidden');
