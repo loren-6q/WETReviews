@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WET! Response Hub</title>
+    <title>WET! Response Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -41,7 +41,7 @@
         <header class="mb-6 text-center">
             <div class="inline-block p-1 rounded-full wet-gradient mb-4 neon-border">
                 <div class="bg-gray-900 rounded-full px-6 py-2">
-                    <h1 class="text-3xl font-black tracking-tighter italic uppercase text-nowrap">WET! <span class="text-pink-500 text-2xl">Response Hub</span></h1>
+                    <h1 class="text-3xl font-black tracking-tighter italic uppercase text-nowrap">WET! <span class="text-pink-500 text-2xl text-nowrap">Response Hub</span></h1>
                 </div>
             </div>
             
@@ -71,7 +71,7 @@
                 <div class="glass border border-white/10 p-4 rounded-3xl">
                     <label class="block text-[10px] font-black uppercase text-purple-400 mb-2 tracking-widest">Extra Tags</label>
                     <input id="extraKeywords" type="text" 
-                        class="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 text-sm outline-none focus:border-purple-400"
+                        class="w-full bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-sm outline-none focus:border-purple-400"
                         placeholder="e.g. Foam Party, Staff name">
                 </div>
                 <div class="glass border border-white/10 p-4 rounded-3xl">
@@ -129,13 +129,6 @@
                 </div>
 
                 <div>
-                    <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Gemini API Key</h2>
-                    <input id="kb-gemini-key" type="password" 
-                        class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
-                        placeholder="Paste your Gemini API Key here...">
-                </div>
-
-                <div>
                     <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Global SEO Keywords</h2>
                     <textarea id="kb-keywords" rows="3" 
                         class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
@@ -171,8 +164,11 @@
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ========================================================
-        // 🛠️ CONFIGURATION
+        // 🛠️ HARDCODED SECRETS - PASTE YOUR GEMINI KEY HERE
         // ========================================================
+        
+        const MY_GEMINI_API_KEY = "AIzaSyBt1031T5YFQw1KZdYLjwc7R9_Tbkoiov8"; 
+
         const MY_FIREBASE_CONFIG = {
             apiKey: "AIzaSyDYBzx9lApoIbYq4GoCLdX4mhSIPt8keSA",
             authDomain: "wetreviews1.firebaseapp.com",
@@ -187,7 +183,6 @@
         const hostelId = MY_HOSTEL_ID;
         const firebaseConfig = MY_FIREBASE_CONFIG;
         const defaultData = {
-            geminiKey: "",
             keywords: "Full Moon Party, WET!, WET Pool Party, most social, Koh Phangan, Wild & Wandering",
             details: "WET! is a 24-hour pool party hostel. Large pool with garden, swim up bar, games, beer pong, DJs. Pre-party hub for Jungle Experience, Waterfall Party, and OXA Party. 24h staff, housekeeping, and maintenance. Guest Group Chat available for reporting issues. Housekeeping cleans twice daily."
         };
@@ -203,7 +198,6 @@
             const saved = localStorage.getItem('wet_local_settings');
             if (saved) {
                 window.currentSettings = JSON.parse(saved);
-                document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                 document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                 document.getElementById('kb-details').value = window.currentSettings.details || "";
             } else {
@@ -215,10 +209,11 @@
         loadLocalData();
 
         async function executeGeminiRequest(payload, retries = 5) {
-            const activeKey = document.getElementById('kb-gemini-key').value;
-            if (!activeKey) throw new Error("API Key Missing");
+            if (!MY_GEMINI_API_KEY || MY_GEMINI_API_KEY === "PASTE_YOUR_API_KEY_HERE") {
+                throw new Error("API Key not found in code");
+            }
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${MY_GEMINI_API_KEY}`;
             let delay = 1000;
 
             for (let i = 0; i < retries; i++) {
@@ -253,7 +248,6 @@
                     onSnapshot(settingsDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             window.currentSettings = docSnap.data();
-                            document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                             document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                             document.getElementById('kb-details').value = window.currentSettings.details || "";
                             localStorage.setItem('wet_local_settings', JSON.stringify(window.currentSettings));
@@ -274,7 +268,6 @@
 
         window.saveSettings = async () => {
             const data = {
-                geminiKey: document.getElementById('kb-gemini-key').value,
                 keywords: document.getElementById('kb-keywords').value,
                 details: document.getElementById('kb-details').value,
                 lastUpdated: Date.now()
@@ -297,6 +290,8 @@
             const resultsBox = document.getElementById('researchResults');
             const btn = document.getElementById('researchBtn');
             const applyBtn = document.getElementById('applyKeywordsBtn');
+            const originalText = btn.innerText;
+
             btn.innerText = "SCRAPING TRENDS...";
             btn.disabled = true;
             document.getElementById('researchResultsContainer').classList.remove('hidden');
@@ -312,7 +307,7 @@
                 resultsBox.innerText = text || "No trends found.";
                 applyBtn.classList.remove('hidden');
             } catch (e) {
-                resultsBox.innerText = "Research error. Check API Key.";
+                resultsBox.innerText = "Research error. Check hardcoded API Key.";
             } finally {
                 btn.innerText = "RESEARCH TRENDING KEYWORDS 🔍";
                 btn.disabled = false;
@@ -355,7 +350,7 @@
                 });
                 generatedText.innerText = text || "Error drafting.";
             } catch (error) {
-                generatedText.innerText = "API Error. Check Settings.";
+                generatedText.innerText = "Check your API Key in the code.";
             } finally {
                 btnText.innerText = "GENERATE RESPONSE";
                 loader.classList.add('hidden');
