@@ -128,6 +128,14 @@
                 </div>
 
                 <div>
+                    <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Gemini API Key (Cloud Secured)</h2>
+                    <input id="kb-gemini-key" type="password" 
+                        class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
+                        placeholder="Paste your Gemini API Key here...">
+                    <p class="text-[9px] text-gray-500 mt-2 italic">Stored in your private Firestore. Hidden from code scannners.</p>
+                </div>
+
+                <div>
                     <h2 class="text-pink-500 font-black uppercase text-xs mb-4 tracking-widest">Global SEO Keywords</h2>
                     <textarea id="kb-keywords" rows="3" 
                         class="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 text-white text-sm outline-none focus:border-pink-500"
@@ -163,11 +171,8 @@
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ========================================================
-        // 🛠️ SECRETS - PASTE YOUR KEYS HERE
+        // 🛠️ FIREBASE CONFIG
         // ========================================================
-        
-        const MY_GEMINI_API_KEY = "PASTE_YOUR_NEW_KEY_HERE"; 
-
         const firebaseConfig = {
             apiKey: "AIzaSyDYBzx9lApoIbYq4GoCLdX4mhSIPt8keSA",
             authDomain: "wetreviews1.firebaseapp.com",
@@ -180,6 +185,7 @@
         // ========================================================
 
         const defaultData = {
+            geminiKey: "",
             keywords: "Full Moon Party, WET!, WET Pool Party, most social, Koh Phangan, Wild & Wandering",
             details: "WET! is a 24-hour pool party hostel. Large pool with garden, swim up bar, games, beer pong, DJs. Pre-party hub for Jungle Experience, Waterfall Party, and OXA Party. 24h staff, housekeeping, and maintenance. Guest Group Chat available for reporting issues. Housekeeping cleans twice daily."
         };
@@ -195,23 +201,21 @@
             const saved = localStorage.getItem('wet_local_settings');
             if (saved) {
                 window.currentSettings = JSON.parse(saved);
+                document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                 document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                 document.getElementById('kb-details').value = window.currentSettings.details || "";
-            } else {
-                document.getElementById('kb-keywords').value = defaultData.keywords;
-                document.getElementById('kb-details').value = defaultData.details;
             }
         };
 
         loadLocalData();
 
         async function executeGeminiRequest(payload, retries = 5) {
-            if (!MY_GEMINI_API_KEY || MY_GEMINI_API_KEY === "PASTE_YOUR_NEW_KEY_HERE") {
-                throw new Error("Missing API Key. Paste your key in the code at line 144.");
+            const activeKey = document.getElementById('kb-gemini-key').value;
+            if (!activeKey) {
+                throw new Error("Missing Gemini API Key. Go to Settings and save your key to the cloud.");
             }
 
-            // Switched to production stable v1 endpoint and standardized gemini-1.5-flash model ID
-            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${MY_GEMINI_API_KEY}`;
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${activeKey}`;
             let delay = 1000;
 
             for (let i = 0; i < retries; i++) {
@@ -257,6 +261,7 @@
                     onSnapshot(settingsDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             window.currentSettings = docSnap.data();
+                            document.getElementById('kb-gemini-key').value = window.currentSettings.geminiKey || "";
                             document.getElementById('kb-keywords').value = window.currentSettings.keywords || "";
                             document.getElementById('kb-details').value = window.currentSettings.details || "";
                             localStorage.setItem('wet_local_settings', JSON.stringify(window.currentSettings));
@@ -265,7 +270,7 @@
                         }
                         window.hideOverlay();
                     }, (err) => {
-                        console.error("Firestore Access Error");
+                        console.error("Cloud Access Issue - Check Firestore Rules");
                         window.hideOverlay();
                     });
                 });
@@ -277,6 +282,7 @@
 
         window.saveSettings = async () => {
             const data = {
+                geminiKey: document.getElementById('kb-gemini-key').value,
                 keywords: document.getElementById('kb-keywords').value,
                 details: document.getElementById('kb-details').value,
                 lastUpdated: Date.now()
